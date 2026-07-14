@@ -1,0 +1,7 @@
+configuration:
+  TZ:
+    name: Timezone
+    description: Container timezone (e.g. Europe/Paris)
+  log_level:
+    name: Log Level
+    description: Dispatcharr logging verbosity

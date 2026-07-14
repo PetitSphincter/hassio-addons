@@ -1,0 +1,35 @@
+name: "Cross-Seed"
+description: "Cross-seed daemon - automatically cross-seed torrents across trackers via Prowlarr"
+version: "1.0.1"
+slug: "cross-seed"
+url: "https://github.com/lexou/hassio-addons"
+init: false
+arch:
+  - amd64
+  - aarch64
+ports:
+  2468/tcp: 2468
+map:
+  - media:rw
+options:
+  torznab_urls: []
+  qbittorrent_url: "http://localhost:8080"
+  qbittorrent_user: "admin"
+  qbittorrent_pass: ""
+  link_dirs: []
+  match_mode: "safe"
+  search_cadence: "1d"
+  rss_cadence: "30m"
+  log_level: "info"
+schema:
+  torznab_urls:
+    - str
+  qbittorrent_url: str
+  qbittorrent_user: str
+  qbittorrent_pass: str
+  link_dirs:
+    - str
+  match_mode: "list(safe|risky)"
+  search_cadence: str
+  rss_cadence: str
+  log_level: "list(info|verbose|debug)"

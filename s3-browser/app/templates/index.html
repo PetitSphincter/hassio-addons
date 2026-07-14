@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S3 Browser</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --surface: #1a1d23;
+      --surface-hover: #22262e;
+      --border: #2a2e37;
+      --text: #e4e6eb;
+      --text-muted: #8b8f98;
+      --accent: #3b82f6;
+      --accent-dim: rgba(59, 130, 246, 0.15);
+      --success: #2dd4a0;
+      --success-dim: rgba(45, 212, 160, 0.15);
+      --warning: #f5a623;
+      --warning-dim: rgba(245, 166, 35, 0.15);
+      --danger: #ff6b6b;
+      --danger-dim: rgba(255, 107, 107, 0.1);
+      --radius: 10px;
+      --font: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top Bar ── */
+    .topbar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .topbar-icon {
+      width: 32px; height: 32px; background: var(--accent);
+      border-radius: 8px; display: flex; align-items: center;
+      justify-content: center; font-size: 16px; flex-shrink: 0;
+    }
+    .topbar h1 { font-size: 16px; font-weight: 600; }
+    .topbar .obj-count { font-size: 11px; color: var(--text-muted); margin-left: 8px; }
+    .topbar .endpoint {
+      font-size: 11px; color: var(--text-muted); background: var(--bg);
+      padding: 3px 8px; border-radius: 4px; margin-left: auto;
+      max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* ── Layout ── */
+    .main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 220px; min-width: 220px;
+      border-right: 1px solid var(--border);
+      background: var(--surface); overflow-y: auto; padding: 12px 0;
+    }
+    .sidebar-title {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px;
+      color: var(--text-muted); padding: 0 16px; margin-bottom: 8px;
+    }
+    .bucket-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 16px; cursor: pointer; font-size: 12px;
+      transition: background 0.15s; border-left: 3px solid transparent;
+    }
+    .bucket-item:hover { background: var(--surface-hover); }
+    .bucket-item.active {
+      background: var(--accent-dim); border-left-color: var(--accent); color: var(--accent);
+    }
+    .bucket-icon { font-size: 14px; flex-shrink: 0; }
+    .bucket-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .bucket-info-btn {
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; font-size: 12px; padding: 2px 4px;
+      border-radius: 4px; opacity: 0; transition: opacity 0.15s;
+      flex-shrink: 0;
+    }
+    .bucket-item:hover .bucket-info-btn,
+    .bucket-item.active .bucket-info-btn { opacity: 1; }
+    .bucket-info-btn:hover { color: var(--accent); background: var(--accent-dim); }
+
+    /* ── Content area ── */
+    .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── Breadcrumb ── */
+    .breadcrumb {
+      display: flex; align-items: center; gap: 4px;
+      padding: 10px 20px; font-size: 12px;
+      border-bottom: 1px solid var(--border); background: var(--bg);
+      flex-wrap: wrap; min-height: 40px;
+    }
+    .crumb {
+      color: var(--text-muted); cursor: pointer; padding: 2px 6px;
+      border-radius: 4px; transition: all 0.15s;
+    }
+    .crumb:hover { color: var(--accent); background: var(--accent-dim); }
+    .crumb.current { color: var(--text); cursor: default; }
+    .crumb.current:hover { background: none; color: var(--text); }
+    .crumb-sep { color: var(--border); font-size: 10px; }
+
+    /* ── File list ── */
+    .file-list { flex: 1; overflow-y: auto; padding: 8px; }
+    .file-header {
+      display: grid; grid-template-columns: 1fr 100px 160px;
+      padding: 6px 12px; font-size: 10px; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--text-muted);
+      border-bottom: 1px solid var(--border); margin-bottom: 4px;
+    }
+    .file-row {
+      display: grid; grid-template-columns: 1fr 100px 160px;
+      align-items: center; padding: 8px 12px; border-radius: 6px;
+      cursor: pointer; font-size: 12px; transition: background 0.12s;
+    }
+    .file-row:hover { background: var(--surface-hover); }
+    .file-row.selected { background: var(--accent-dim); }
+    .file-name { display: flex; align-items: center; gap: 10px; overflow: hidden; }
+    .file-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-icon { font-size: 16px; flex-shrink: 0; }
+    .file-size { color: var(--text-muted); font-size: 11px; text-align: right; }
+    .file-date { color: var(--text-muted); font-size: 11px; text-align: right; }
+
+    /* ── Cold storage ── */
+    .cold-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; padding: 2px 6px; border-radius: 3px;
+      background: rgba(100, 160, 255, 0.12); color: #64a0ff;
+      margin-left: 8px; flex-shrink: 0;
+    }
+    .file-row.is-cold .file-name span { color: var(--text-muted); }
+
+    .restore-box {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; padding: 12px; margin-top: 12px;
+    }
+    .restore-box .rtitle {
+      font-size: 11px; font-weight: 600; margin-bottom: 8px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .restore-opts { display: flex; gap: 8px; margin-bottom: 8px; }
+    .restore-opts select, .restore-opts input {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 4px; padding: 6px 8px; color: var(--text);
+      font-family: var(--font); font-size: 11px; flex: 1;
+    }
+    .btn-restore {
+      background: #64a0ff; color: #fff; border: none; border-radius: 6px;
+      padding: 8px 16px; font-family: var(--font); font-size: 11px;
+      font-weight: 600; cursor: pointer; width: 100%;
+    }
+    .btn-restore:hover { opacity: 0.85; }
+    .restore-status { font-size: 11px; padding: 8px; border-radius: 4px; margin-top: 8px; }
+    .restore-status.success { background: var(--success-dim); color: var(--success); }
+    .restore-status.error { background: var(--danger-dim); color: var(--danger); }
+    .restore-status.pending { background: var(--warning-dim); color: var(--warning); }
+
+    /* ── Infinite scroll ── */
+    .load-more { text-align: center; padding: 16px; color: var(--text-muted); font-size: 11px; }
+
+    /* ── Right Panel (shared: file preview + bucket info) ── */
+    .right-panel {
+      width: 0; overflow: hidden;
+      border-left: 1px solid var(--border); background: var(--surface);
+      transition: width 0.25s ease; display: flex; flex-direction: column;
+    }
+    .right-panel.open { width: 400px; }
+    .right-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; border-bottom: 1px solid var(--border); min-height: 48px;
+    }
+    .right-panel-title {
+      font-size: 12px; font-weight: 600; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap; flex: 1;
+    }
+    .right-panel-close {
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; font-size: 18px; padding: 4px; line-height: 1;
+    }
+    .right-panel-close:hover { color: var(--text); }
+    .right-panel-body { flex: 1; overflow-y: auto; padding: 16px; }
+    .right-panel-actions { padding: 12px 16px; border-top: 1px solid var(--border); }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex; gap: 0; border-bottom: 1px solid var(--border);
+      padding: 0 16px; background: var(--surface);
+    }
+    .tab {
+      padding: 10px 14px; font-size: 11px; font-family: var(--font);
+      color: var(--text-muted); cursor: pointer; border: none; background: none;
+      border-bottom: 2px solid transparent; transition: all 0.15s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Bucket info sections ── */
+    .info-section {
+      margin-bottom: 16px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+    }
+    .info-section-title {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+      color: var(--text-muted); padding: 8px 12px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+    }
+    .info-section-body { padding: 10px 12px; }
+    .info-row {
+      display: flex; justify-content: space-between; padding: 4px 0;
+      border-bottom: 1px solid var(--border); font-size: 11px;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: var(--text-muted); }
+    .info-value { color: var(--text); text-align: right; word-break: break-all; }
+
+    .status-pill {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+    }
+    .pill-enabled { background: var(--success-dim); color: var(--success); }
+    .pill-disabled { background: var(--danger-dim); color: var(--danger); }
+    .pill-warning { background: var(--warning-dim); color: var(--warning); }
+
+    .lifecycle-rule {
+      padding: 10px; margin-bottom: 8px; background: var(--surface);
+      border-radius: 6px; border: 1px solid var(--border);
+    }
+    .lifecycle-rule:last-child { margin-bottom: 0; }
+    .lifecycle-rule-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 6px;
+    }
+    .lifecycle-rule-id { font-size: 11px; font-weight: 600; }
+    .lifecycle-transition {
+      font-size: 10px; color: var(--text-muted); padding: 3px 0;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .lifecycle-arrow { color: var(--accent); }
+
+    .policy-code {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; padding: 12px; overflow: auto; max-height: 400px;
+    }
+    .policy-code pre {
+      font-family: var(--font); font-size: 10px; line-height: 1.5;
+      white-space: pre-wrap; word-break: break-all; color: var(--text);
+    }
+
+    .tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag-chip {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 4px; padding: 3px 8px; font-size: 10px;
+    }
+    .tag-chip .key { color: var(--accent); }
+    .tag-chip .val { color: var(--text-muted); }
+
+    .no-data { color: var(--text-muted); font-size: 11px; font-style: italic; padding: 8px 0; }
+    .api-error {
+      background: var(--danger-dim); border: 1px solid rgba(255,107,107,0.2);
+      color: var(--danger); padding: 8px 10px; border-radius: 4px;
+      font-size: 10px; word-break: break-all;
+    }
+
+    /* ── Preview meta ── */
+    .preview-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 16px; }
+    .preview-meta-row {
+      display: flex; justify-content: space-between; padding: 4px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .preview-meta-label { color: var(--text-muted); }
+    .preview-meta-value { color: var(--text); text-align: right; word-break: break-all; }
+    .preview-content {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; padding: 12px; overflow: auto; max-height: 400px;
+    }
+    .preview-content pre {
+      font-family: var(--font); font-size: 11px; line-height: 1.5;
+      white-space: pre-wrap; word-break: break-all; color: var(--text);
+    }
+    .preview-content img { max-width: 100%; border-radius: 4px; }
+
+    .btn {
+      background: var(--accent); color: #fff; border: none; border-radius: 6px;
+      padding: 8px 16px; font-family: var(--font); font-size: 11px;
+      font-weight: 600; cursor: pointer; width: 100%;
+    }
+    .btn:hover { opacity: 0.85; }
+
+    /* ── States ── */
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 12px; }
+    .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+    .loading { text-align: center; padding: 40px; color: var(--text-muted); font-size: 12px; }
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+      margin-right: 8px; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error-msg {
+      background: var(--danger-dim); border: 1px solid rgba(255,68,68,0.3);
+      color: var(--danger); padding: 12px 16px; border-radius: 6px;
+      font-size: 12px; margin: 12px;
+    }
+
+    @media (max-width: 800px) {
+      .sidebar { width: 180px; min-width: 180px; }
+      .right-panel.open { width: 300px; }
+      .file-header, .file-row { grid-template-columns: 1fr 80px; }
+      .file-date { display: none; }
+    }
+    @media (max-width: 600px) {
+      .main { flex-direction: column; }
+      .sidebar { width: 100%; min-width: 100%; max-height: 120px; border-right: none; border-bottom: 1px solid var(--border); }
+      .right-panel.open { position: fixed; right: 0; top: 0; bottom: 0; width: 90vw; z-index: 10; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="topbar-icon">☁</div>
+    <h1>S3 Browser</h1>
+    <span class="obj-count" id="objCount"></span>
+    <span class="endpoint" title="{{ endpoint }}">{{ endpoint }}</span>
+  </div>
+
+  <div class="main">
+    <div class="sidebar">
+      <div class="sidebar-title">Buckets</div>
+      <div id="bucketList">
+        <div class="loading"><span class="spinner"></span>Chargement...</div>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="breadcrumb" id="breadcrumb">
+        <span class="crumb current">Sélectionner un bucket</span>
+      </div>
+      <div class="file-list" id="fileList">
+        <div class="empty-state">
+          <div class="icon">📂</div>
+          Sélectionnez un bucket pour commencer
+        </div>
+      </div>
+    </div>
+
+    <div class="right-panel" id="rightPanel">
+      <div class="right-panel-header">
+        <span class="right-panel-title" id="rightPanelTitle">—</span>
+        <button class="right-panel-close" onclick="closeRightPanel()">×</button>
+      </div>
+      <div id="rightPanelTabs"></div>
+      <div class="right-panel-body" id="rightPanelBody"></div>
+      <div class="right-panel-actions" id="rightPanelActions" style="display:none;">
+        <button class="btn" id="downloadBtn" onclick="downloadFile()">Télécharger</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const API = window.location.pathname.replace(/\/$/, '');
+const DEFAULT_BUCKET = '{{ default_bucket }}';
+
+let currentBucket = '';
+let currentPrefix = '';
+let selectedKey = '';
+let rightPanelMode = ''; // 'file' or 'bucket'
+
+// Pagination
+let nextToken = null;
+let isLoadingMore = false;
+let totalLoaded = 0;
+let scrollObserver = null;
+
+// ── Icons ──
+const ICONS = {
+  folder:'📁',image:'🖼',video:'🎬',audio:'🎵',text:'📄',
+  code:'💻',data:'📊',archive:'📦',pdf:'📕',default:'📎',
+};
+
+function getIcon(ext, type) {
+  if (type === 'folder') return ICONS.folder;
+  const map = {
+    jpg:'image',jpeg:'image',png:'image',gif:'image',webp:'image',svg:'image',tif:'image',tiff:'image',
+    mp4:'video',mkv:'video',avi:'video',mov:'video',webm:'video',
+    mp3:'audio',flac:'audio',wav:'audio',ogg:'audio',m4a:'audio',
+    txt:'text',md:'text',log:'text',csv:'text',
+    py:'code',js:'code',html:'code',css:'code',sh:'code',yaml:'code',yml:'code',json:'code',xml:'code',sql:'code',toml:'code',geojson:'code',
+    parquet:'data',arrow:'data',nc:'data',hdf5:'data',h5:'data',zarr:'data',
+    zip:'archive',tar:'archive',gz:'archive',bz2:'archive','7z':'archive',rar:'archive',
+    pdf:'pdf',
+  };
+  return ICONS[map[ext] || 'default'];
+}
+
+// ── Cold storage ──
+const COLD_CLASSES = new Set(['GLACIER','DEEP_ARCHIVE','GLACIER_IR','glacier-sc','glacier-dc','GLACIER-SC','GLACIER-DC']);
+function isCold(sc) { return COLD_CLASSES.has(sc || ''); }
+function coldLabel(sc) {
+  const l = {'GLACIER':'Glacier','DEEP_ARCHIVE':'Deep Archive','GLACIER_IR':'Glacier IR',
+    'glacier-sc':'Glacier SC','glacier-dc':'Glacier DC','GLACIER-SC':'Glacier SC','GLACIER-DC':'Glacier DC'};
+  return l[sc] || sc;
+}
+
+// ── Helpers ──
+function fmtSize(b) {
+  if (b === 0) return '0 B';
+  const k = 1024, s = ['B','KB','MB','GB','TB'];
+  const i = Math.floor(Math.log(b) / Math.log(k));
+  return parseFloat((b / Math.pow(k, i)).toFixed(1)) + ' ' + s[i];
+}
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'});
+}
+function updateCount() {
+  const el = document.getElementById('objCount');
+  el.textContent = totalLoaded > 0 ? `${totalLoaded} objet${totalLoaded > 1 ? 's' : ''}${nextToken ? '+' : ''}` : '';
+}
+function escHtml(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escAttr(s) { return (s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+
+async function apiFetch(path) { return (await fetch(API + path)).json(); }
+
+// ── Load Buckets ──
+async function loadBuckets() {
+  const data = await apiFetch('/api/buckets');
+  const el = document.getElementById('bucketList');
+  if (data.error) { el.innerHTML = `<div class="error-msg">${escHtml(data.error)}</div>`; return; }
+  if (data.buckets.length === 0) { el.innerHTML = '<div class="empty-state" style="padding:20px;">Aucun bucket</div>'; return; }
+
+  el.innerHTML = data.buckets.map(b => `
+    <div class="bucket-item" onclick="selectBucket('${escAttr(b.name)}')" id="bucket-${escAttr(b.name)}">
+      <span class="bucket-icon">🪣</span>
+      <span class="bucket-name" title="${escAttr(b.name)}">${escHtml(b.name)}</span>
+      <button class="bucket-info-btn" onclick="event.stopPropagation();showBucketInfo('${escAttr(b.name)}')" title="Infos bucket">ℹ</button>
+    </div>
+  `).join('');
+
+  if (DEFAULT_BUCKET) selectBucket(DEFAULT_BUCKET);
+}
+
+// ── Select Bucket ──
+function selectBucket(name) {
+  currentBucket = name; currentPrefix = '';
+  closeRightPanel();
+  document.querySelectorAll('.bucket-item').forEach(el => el.classList.remove('active'));
+  const item = document.getElementById('bucket-' + name);
+  if (item) item.classList.add('active');
+  loadObjects(false);
+}
+
+// ── Render rows ──
+function renderRows(folders, objects) {
+  let h = '';
+  for (const f of folders) {
+    h += `<div class="file-row" ondblclick="openFolder('${escAttr(f.prefix)}')">
+      <div class="file-name"><span class="file-icon">${ICONS.folder}</span><span title="${escAttr(f.name)}">${escHtml(f.name)}/</span></div>
+      <span class="file-size">—</span><span class="file-date">—</span></div>`;
+  }
+  for (const o of objects) {
+    const c = isCold(o.storage_class);
+    h += `<div class="file-row ${c?'is-cold':''}" onclick="selectFile(this,'${escAttr(o.key)}')" ondblclick="previewFile('${escAttr(o.key)}')" data-storage="${escAttr(o.storage_class||'')}">
+      <div class="file-name"><span class="file-icon">${c?'🧊':getIcon(o.extension,'file')}</span><span title="${escAttr(o.name)}">${escHtml(o.name)}</span>${c?`<span class="cold-badge">${coldLabel(o.storage_class)}</span>`:''}</div>
+      <span class="file-size">${fmtSize(o.size)}</span><span class="file-date">${fmtDate(o.last_modified)}</span></div>`;
+  }
+  return h;
+}
+
+// ── Infinite scroll ──
+function setupScrollObserver() {
+  if (scrollObserver) { scrollObserver.disconnect(); scrollObserver = null; }
+  const sentinel = document.getElementById('scrollSentinel');
+  if (!sentinel) return;
+  scrollObserver = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && nextToken && !isLoadingMore) loadMore();
+  }, { root: document.getElementById('fileList'), rootMargin: '200px' });
+  scrollObserver.observe(sentinel);
+}
+
+// ── Load Objects ──
+async function loadObjects(append) {
+  const list = document.getElementById('fileList');
+  if (!append) {
+    list.innerHTML = '<div class="loading"><span class="spinner"></span>Chargement...</div>';
+    nextToken = null; totalLoaded = 0; updateBreadcrumb();
+  }
+  let url = `/api/browse/${encodeURIComponent(currentBucket)}?prefix=${encodeURIComponent(currentPrefix)}`;
+  if (append && nextToken) url += `&token=${encodeURIComponent(nextToken)}`;
+
+  const data = await apiFetch(url);
+  if (data.error) { list.innerHTML = `<div class="error-msg">${escHtml(data.error)}</div>`; return; }
+
+  const items = [...data.folders, ...data.objects];
+  totalLoaded += items.length;
+  nextToken = data.is_truncated ? data.next_token : null;
+
+  if (!append) {
+    if (items.length === 0) { list.innerHTML = '<div class="empty-state"><div class="icon">📂</div>Dossier vide</div>'; updateCount(); return; }
+    let h = `<div class="file-header"><span>Nom</span><span style="text-align:right">Taille</span><span style="text-align:right">Modifié</span></div>`;
+    if (currentPrefix) h += `<div class="file-row" ondblclick="goUp()"><div class="file-name"><span class="file-icon">⬆</span><span>..</span></div><span class="file-size">—</span><span class="file-date">—</span></div>`;
+    h += renderRows(data.folders, data.objects);
+    if (nextToken) h += `<div id="scrollSentinel" class="load-more"><span class="spinner"></span>Chargement...</div>`;
+    list.innerHTML = h;
+  } else {
+    const sentinel = document.getElementById('scrollSentinel');
+    const frag = document.createElement('div');
+    frag.innerHTML = renderRows(data.folders, data.objects);
+    if (sentinel) {
+      while (frag.firstChild) list.insertBefore(frag.firstChild, sentinel);
+      if (!nextToken) sentinel.remove();
+    }
+  }
+  updateCount();
+  if (nextToken) requestAnimationFrame(() => setupScrollObserver());
+}
+
+async function loadMore() {
+  if (isLoadingMore || !nextToken) return;
+  isLoadingMore = true; await loadObjects(true); isLoadingMore = false;
+}
+
+// ── Navigation ──
+function openFolder(p) { currentPrefix = p; closeRightPanel(); loadObjects(false); }
+function goUp() {
+  if (!currentPrefix) return;
+  const parts = currentPrefix.replace(/\/$/, '').split('/'); parts.pop();
+  currentPrefix = parts.length > 0 ? parts.join('/') + '/' : '';
+  closeRightPanel(); loadObjects(false);
+}
+function navigateTo(p) { currentPrefix = p; closeRightPanel(); loadObjects(false); }
+
+function updateBreadcrumb() {
+  const el = document.getElementById('breadcrumb');
+  let h = `<span class="crumb" onclick="selectBucket('${escAttr(currentBucket)}')">${escHtml(currentBucket)}</span>`;
+  if (currentPrefix) {
+    const parts = currentPrefix.replace(/\/$/, '').split('/');
+    let acc = '';
+    for (let i = 0; i < parts.length; i++) {
+      acc += parts[i] + '/';
+      h += `<span class="crumb-sep">/</span>`;
+      h += i === parts.length - 1
+        ? `<span class="crumb current">${escHtml(parts[i])}</span>`
+        : `<span class="crumb" onclick="navigateTo('${escAttr(acc)}')">${escHtml(parts[i])}</span>`;
+    }
+  }
+  el.innerHTML = h;
+}
+
+// ══════════════════════════════════════════
+// ── Right Panel: shared for file + bucket
+// ══════════════════════════════════════════
+
+function closeRightPanel() {
+  document.getElementById('rightPanel').classList.remove('open');
+  document.getElementById('rightPanelTabs').innerHTML = '';
+  document.getElementById('rightPanelActions').style.display = 'none';
+  rightPanelMode = ''; selectedKey = '';
+}
+
+// ── FILE PREVIEW ──
+function selectFile(rowEl, key) {
+  selectedKey = key;
+  document.querySelectorAll('.file-row').forEach(r => r.classList.remove('selected'));
+  rowEl.classList.add('selected');
+  previewFile(key);
+}
+
+async function previewFile(key) {
+  selectedKey = key; rightPanelMode = 'file';
+  const panel = document.getElementById('rightPanel');
+  const title = document.getElementById('rightPanelTitle');
+  const tabs = document.getElementById('rightPanelTabs');
+  const body = document.getElementById('rightPanelBody');
+  const actions = document.getElementById('rightPanelActions');
+
+  const name = key.split('/').pop();
+  title.textContent = name;
+  tabs.innerHTML = '';
+  panel.classList.add('open');
+  body.innerHTML = '<div class="loading"><span class="spinner"></span>Chargement...</div>';
+
+  const info = await apiFetch(`/api/info/${encodeURIComponent(currentBucket)}?key=${encodeURIComponent(key)}`);
+
+  let metaHtml = '<div class="preview-meta">';
+  if (!info.error) {
+    const rows = [['Taille',fmtSize(info.size)],['Type',info.content_type],['Modifié',fmtDate(info.last_modified)],['ETag',info.etag||'—'],['Storage',info.storage_class||'STANDARD']];
+    if (info.metadata && Object.keys(info.metadata).length > 0)
+      for (const [k,v] of Object.entries(info.metadata)) rows.push([k,v]);
+    metaHtml += rows.map(([l,v]) => `<div class="preview-meta-row"><span class="preview-meta-label">${escHtml(l)}</span><span class="preview-meta-value">${escHtml(v)}</span></div>`).join('');
+  }
+  metaHtml += '</div>';
+
+  const cold = isCold(info.storage_class);
+  let restoreHtml = '';
+  let canDownload = !cold;
+
+  if (cold) {
+    let rs = { status: 'frozen' };
+    try { const r = await fetch(API+`/api/restore-status/${encodeURIComponent(currentBucket)}?key=${encodeURIComponent(key)}`); if (r.ok) rs = await r.json(); } catch(e) {}
+
+    restoreHtml = '<div class="restore-box">';
+    if (rs.error) {
+      restoreHtml += `<div class="rtitle">🧊 Objet archivé (${coldLabel(info.storage_class)})</div><div class="restore-status error">${escHtml(rs.error)}</div>`;
+    } else if (rs.status === 'frozen') {
+      restoreHtml += `<div class="rtitle">🧊 Objet archivé (${coldLabel(info.storage_class)})</div>
+        <p style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Cet objet doit être restauré avant téléchargement.</p>
+        <div class="restore-opts"><select id="restoreTier"><option value="Expedited">Expedited (~1-5 min)</option><option value="Standard" selected>Standard (~3-5 h)</option><option value="Bulk">Bulk (~5-12 h)</option></select>
+        <input type="number" id="restoreDays" value="7" min="1" max="30" style="max-width:70px;" title="Jours"></div>
+        <button class="btn-restore" onclick="requestRestore()">Restaurer</button><div id="restoreResult"></div>`;
+    } else if (rs.status === 'restoring') {
+      restoreHtml += `<div class="rtitle">⏳ Restauration en cours</div><div class="restore-status pending">Réessayez dans quelques heures.</div>`;
+    } else if (rs.status === 'restored') {
+      restoreHtml += `<div class="rtitle">✅ Restauré temporairement</div><div class="restore-status success">Disponible au téléchargement.</div>`;
+      canDownload = true;
+    }
+    restoreHtml += '</div>';
+  }
+
+  let contentHtml = '';
+  if (!cold) {
+    const preview = await apiFetch(`/api/preview/${encodeURIComponent(currentBucket)}?key=${encodeURIComponent(key)}`);
+    if (preview.type === 'text') contentHtml = `<div class="preview-content"><pre>${escHtml(preview.content)}</pre></div>`;
+    else if (preview.type === 'image') contentHtml = `<div class="preview-content"><img src="${preview.data}" alt="${escAttr(name)}"></div>`;
+    else if (preview.type === 'too_large') contentHtml = `<div class="preview-content"><pre style="color:var(--text-muted);">Trop volumineux (${fmtSize(preview.size)})</pre></div>`;
+    else contentHtml = `<div class="preview-content"><pre style="color:var(--text-muted);">Pas de preview disponible</pre></div>`;
+  } else {
+    contentHtml = `<div class="preview-content"><pre style="color:var(--text-muted);">Preview indisponible — stockage froid</pre></div>`;
+  }
+
+  body.innerHTML = metaHtml + restoreHtml + contentHtml;
+  actions.style.display = canDownload ? 'block' : 'none';
+}
+
+async function requestRestore() {
+  const tier = document.getElementById('restoreTier').value;
+  const days = parseInt(document.getElementById('restoreDays').value) || 7;
+  const el = document.getElementById('restoreResult');
+  el.innerHTML = '<div class="restore-status pending">Envoi...</div>';
+  const d = await fetch(API+`/api/restore/${encodeURIComponent(currentBucket)}`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({key:selectedKey,days,tier}),
+  }).then(r=>r.json());
+  if (d.error) el.innerHTML = `<div class="restore-status error">${escHtml(d.error)}</div>`;
+  else if (d.status === 'already_restoring') el.innerHTML = '<div class="restore-status pending">Déjà en cours</div>';
+  else el.innerHTML = `<div class="restore-status success">Lancée (${escHtml(tier)}, ${days}j)</div>`;
+}
+
+function downloadFile() {
+  if (!selectedKey || !currentBucket) return;
+  const url = API + `/api/download/${encodeURIComponent(currentBucket)}?key=${encodeURIComponent(selectedKey)}`;
+  const a = document.createElement('a'); a.href = url; a.download = selectedKey.split('/').pop();
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+// ══════════════════════════════════════
+// ── BUCKET INFO PANEL
+// ══════════════════════════════════════
+
+async function showBucketInfo(bucket) {
+  rightPanelMode = 'bucket';
+  const panel = document.getElementById('rightPanel');
+  const title = document.getElementById('rightPanelTitle');
+  const tabs = document.getElementById('rightPanelTabs');
+  const body = document.getElementById('rightPanelBody');
+  const actions = document.getElementById('rightPanelActions');
+
+  title.textContent = bucket;
+  actions.style.display = 'none';
+  panel.classList.add('open');
+
+  tabs.innerHTML = `<div class="tabs">
+    <button class="tab active" onclick="switchBucketTab('overview',this)">Vue d'ensemble</button>
+    <button class="tab" onclick="switchBucketTab('lifecycle',this)">Lifecycle</button>
+    <button class="tab" onclick="switchBucketTab('policy',this)">Policy</button>
+    <button class="tab" onclick="switchBucketTab('lock',this)">Lock & Tags</button>
+  </div>`;
+
+  body.innerHTML = '<div class="loading"><span class="spinner"></span>Chargement...</div>';
+
+  // Fetch all in parallel
+  const data = await apiFetch(`/api/bucket-info/${encodeURIComponent(bucket)}`);
+  window._bucketInfo = data;
+  window._bucketInfoName = bucket;
+
+  renderBucketTab('overview');
+}
+
+function switchBucketTab(tab, el) {
+  document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderBucketTab(tab);
+}
+
+function renderBucketTab(tab) {
+  const body = document.getElementById('rightPanelBody');
+  const d = window._bucketInfo;
+  const name = window._bucketInfoName;
+
+  if (tab === 'overview') {
+    let h = '';
+    // Stats
+    const st = d.stats;
+    h += `<div class="info-section"><div class="info-section-title">Statistiques (échantillon)</div><div class="info-section-body">`;
+    if (st.error) h += `<div class="api-error">${escHtml(st.error)}</div>`;
+    else {
+      h += `<div class="info-row"><span class="info-label">Objets (sample)</span><span class="info-value">${st.count}${st.is_truncated ? '+' : ''}</span></div>`;
+      h += `<div class="info-row"><span class="info-label">Taille (sample)</span><span class="info-value">${fmtSize(st.total_size)}</span></div>`;
+    }
+    h += '</div></div>';
+
+    // Versioning
+    const v = d.versioning;
+    h += `<div class="info-section"><div class="info-section-title">Versioning</div><div class="info-section-body">`;
+    if (v.error) h += `<div class="api-error">${escHtml(v.error)}</div>`;
+    else {
+      const vs = v.status || 'Disabled';
+      const pill = vs === 'Enabled' ? 'pill-enabled' : vs === 'Suspended' ? 'pill-warning' : 'pill-disabled';
+      h += `<div class="info-row"><span class="info-label">Status</span><span class="info-value"><span class="status-pill ${pill}">${vs}</span></span></div>`;
+      h += `<div class="info-row"><span class="info-label">MFA Delete</span><span class="info-value">${v.mfa_delete || 'Disabled'}</span></div>`;
+    }
+    h += '</div></div>';
+
+    // Object Lock summary
+    const ol = d.object_lock;
+    h += `<div class="info-section"><div class="info-section-title">Object Lock</div><div class="info-section-body">`;
+    if (ol.error) h += `<div class="api-error">${escHtml(ol.error)}</div>`;
+    else {
+      const pill = ol.enabled ? 'pill-enabled' : 'pill-disabled';
+      h += `<div class="info-row"><span class="info-label">Status</span><span class="info-value"><span class="status-pill ${pill}">${ol.enabled ? 'Enabled' : 'Disabled'}</span></span></div>`;
+      if (ol.enabled) {
+        if (ol.mode) h += `<div class="info-row"><span class="info-label">Mode</span><span class="info-value">${ol.mode}</span></div>`;
+        if (ol.days) h += `<div class="info-row"><span class="info-label">Rétention</span><span class="info-value">${ol.days} jours</span></div>`;
+        if (ol.years) h += `<div class="info-row"><span class="info-label">Rétention</span><span class="info-value">${ol.years} ans</span></div>`;
+      }
+    }
+    h += '</div></div>';
+
+    // Quick lifecycle count
+    const lc = d.lifecycle;
+    h += `<div class="info-section"><div class="info-section-title">Lifecycle</div><div class="info-section-body">`;
+    if (lc.error) h += `<div class="api-error">${escHtml(lc.error)}</div>`;
+    else h += `<div class="info-row"><span class="info-label">Règles</span><span class="info-value">${lc.rules.length}</span></div>`;
+    h += '</div></div>';
+
+    body.innerHTML = h;
+
+  } else if (tab === 'lifecycle') {
+    const lc = d.lifecycle;
+    let h = '';
+    if (lc.error) { h = `<div class="api-error">${escHtml(lc.error)}</div>`; }
+    else if (lc.rules.length === 0) { h = '<div class="no-data">Aucune règle lifecycle configurée</div>'; }
+    else {
+      for (const r of lc.rules) {
+        const statusPill = r.status === 'Enabled' ? 'pill-enabled' : 'pill-disabled';
+        h += `<div class="lifecycle-rule">
+          <div class="lifecycle-rule-header">
+            <span class="lifecycle-rule-id">${escHtml(r.id)}</span>
+            <span class="status-pill ${statusPill}">${r.status}</span>
+          </div>`;
+        if (r.prefix !== undefined && r.prefix !== null) h += `<div class="lifecycle-transition">Prefix: <code>${escHtml(r.prefix || '*')}</code></div>`;
+        for (const t of (r.transitions || [])) {
+          h += `<div class="lifecycle-transition"><span class="lifecycle-arrow">→</span> ${t.days} jours → <strong>${escHtml(t.storage_class)}</strong></div>`;
+        }
+        if (r.expiration_days) h += `<div class="lifecycle-transition"><span class="lifecycle-arrow">🗑</span> Expiration: ${r.expiration_days} jours</div>`;
+        if (r.noncurrent_transitions) {
+          for (const t of r.noncurrent_transitions) {
+            h += `<div class="lifecycle-transition"><span class="lifecycle-arrow">→</span> Noncurrent ${t.days}j → <strong>${escHtml(t.storage_class)}</strong></div>`;
+          }
+        }
+        if (r.noncurrent_expiration_days) h += `<div class="lifecycle-transition"><span class="lifecycle-arrow">🗑</span> Noncurrent exp: ${r.noncurrent_expiration_days}j</div>`;
+        h += '</div>';
+      }
+    }
+    body.innerHTML = h;
+
+  } else if (tab === 'policy') {
+    const p = d.policy;
+    let h = '';
+    if (p.error) { h = `<div class="api-error">${escHtml(p.error)}</div>`; }
+    else if (!p.policy) { h = '<div class="no-data">Aucune bucket policy configurée</div>'; }
+    else { h = `<div class="policy-code"><pre>${escHtml(JSON.stringify(p.policy, null, 2))}</pre></div>`; }
+    body.innerHTML = h;
+
+  } else if (tab === 'lock') {
+    let h = '';
+
+    // Object Lock detail
+    const ol = d.object_lock;
+    h += `<div class="info-section"><div class="info-section-title">Object Lock</div><div class="info-section-body">`;
+    if (ol.error) h += `<div class="api-error">${escHtml(ol.error)}</div>`;
+    else {
+      const pill = ol.enabled ? 'pill-enabled' : 'pill-disabled';
+      h += `<div class="info-row"><span class="info-label">Status</span><span class="info-value"><span class="status-pill ${pill}">${ol.enabled ? 'Enabled' : 'Disabled'}</span></span></div>`;
+      if (ol.enabled) {
+        if (ol.mode) h += `<div class="info-row"><span class="info-label">Mode</span><span class="info-value">${ol.mode}</span></div>`;
+        if (ol.days) h += `<div class="info-row"><span class="info-label">Rétention par défaut</span><span class="info-value">${ol.days} jours</span></div>`;
+        if (ol.years) h += `<div class="info-row"><span class="info-label">Rétention par défaut</span><span class="info-value">${ol.years} ans</span></div>`;
+      }
+    }
+    h += '</div></div>';
+
+    // Tags
+    const tg = d.tagging;
+    h += `<div class="info-section"><div class="info-section-title">Tags</div><div class="info-section-body">`;
+    if (tg.error) h += `<div class="api-error">${escHtml(tg.error)}</div>`;
+    else if (Object.keys(tg.tags).length === 0) h += '<div class="no-data">Aucun tag</div>';
+    else {
+      h += '<div class="tag-list">';
+      for (const [k, v] of Object.entries(tg.tags)) {
+        h += `<span class="tag-chip"><span class="key">${escHtml(k)}</span>=<span class="val">${escHtml(v)}</span></span>`;
+      }
+      h += '</div>';
+    }
+    h += '</div></div>';
+
+    body.innerHTML = h;
+  }
+}
+
+// ── Init ──
+loadBuckets();
+</script>
+
+</body>
+</html>

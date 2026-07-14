@@ -1,0 +1,31 @@
+name: "S3 Browser"
+description: "Browse S3-compatible object storage (read-only) — Scality, MinIO, AWS"
+version: "0.2.0"
+slug: "s3_browser"
+url: "https://github.com/lexou/hassio-addons"
+init: false
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+ingress: true
+ingress_port: 8099
+panel_icon: "mdi:cloud-search"
+panel_title: "S3 Browser"
+map:
+  - ssl:ro
+options:
+  endpoint_url: "https://s3.example.com"
+  access_key: ""
+  secret_key: ""
+  region: "us-east-1"
+  verify_ssl: true
+  default_bucket: ""
+schema:
+  endpoint_url: str
+  access_key: password
+  secret_key: password
+  region: str
+  verify_ssl: bool
+  default_bucket: str

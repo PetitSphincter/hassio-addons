@@ -1,0 +1,7 @@
+configuration:
+  TZ:
+    name: Fuseau horaire
+    description: Fuseau horaire du conteneur (ex. Europe/Paris)
+  log_level:
+    name: Niveau de log
+    description: Niveau de verbosité des logs Dispatcharr

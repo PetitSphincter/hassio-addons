@@ -1,0 +1,27 @@
+name: "Heimdall"
+description: "Application dashboard and launcher for Home Assistant"
+version: "0.1.0"
+slug: "heimdall"
+url: "https://heimdall.site/"
+init: false
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+ingress: true
+ingress_port: 80
+panel_icon: "mdi:view-dashboard"
+panel_title: "Heimdall"
+ports:
+  80/tcp: 6610
+ports_description:
+  80/tcp: "Heimdall Web UI (accès direct http://homeassistant:6610)"
+options:
+  TZ: "Europe/Paris"
+  PUID: 0
+  PGID: 0
+schema:
+  TZ: str
+  PUID: int
+  PGID: int

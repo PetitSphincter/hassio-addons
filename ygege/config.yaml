@@ -1,0 +1,22 @@
+name: "Ygege - YGG Indexer"
+description: "YGG Torrent indexer via Nostr relay for Prowlarr"
+version: "1.0.0"
+slug: "ygege"
+url: "https://github.com/lexou/hassio-addons"
+init: false
+arch:
+  - amd64
+  - aarch64
+  - armv7
+ports:
+  8715/tcp: 8715
+options:
+  relay_url: "wss://relay.ygg.gratis"
+  log_level: "info"
+schema:
+  relay_url: str?
+  log_level: list(trace|debug|info|warn|error)?
+build_from:
+  amd64: "ghcr.io/home-assistant/amd64-base:latest"
+  aarch64: "ghcr.io/home-assistant/aarch64-base:latest"
+  armv7: "ghcr.io/home-assistant/armv7-base:latest"

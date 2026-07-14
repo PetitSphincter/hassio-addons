@@ -1,0 +1,32 @@
+name: "yt-dlp Downloader"
+description: "Télécharge des vidéos/playlists YouTube avec yt-dlp, optimisé pour Jellyfin"
+version: "0.2.0"
+slug: "ytdlp_downloader"
+url: "https://github.com/lexou/hassio-addons"
+arch:
+  - amd64
+  - aarch64
+init: false
+startup: application
+boot: auto
+ingress: true
+ingress_port: 8099
+panel_icon: "mdi:youtube"
+panel_title: "yt-dlp"
+map:
+  - media:rw
+  - share:rw
+options:
+  output_dir: "/media/videos"
+  default_quality: "1080p"
+  jellyfin_naming: true
+  embed_thumbnail: true
+  embed_metadata: true
+  preferred_codec: "av1"
+schema:
+  output_dir: str
+  default_quality: list(audio|mp3|720p|1080p|4k)
+  jellyfin_naming: bool
+  embed_thumbnail: bool
+  embed_metadata: bool
+  preferred_codec: list(av1|vp9|h264|any)

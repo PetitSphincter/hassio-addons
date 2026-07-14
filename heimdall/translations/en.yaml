@@ -1,0 +1,10 @@
+configuration:
+  TZ:
+    name: Timezone
+    description: Container timezone (e.g. Europe/Paris)
+  PUID:
+    name: User ID
+    description: User ID inside the container (0 = root)
+  PGID:
+    name: Group ID
+    description: Group ID inside the container (0 = root)

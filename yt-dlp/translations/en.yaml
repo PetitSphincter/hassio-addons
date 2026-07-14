@@ -1,0 +1,19 @@
+configuration:
+  output_dir:
+    name: Output directory
+    description: Path where videos will be saved (e.g. /media/videos)
+  default_quality:
+    name: Default quality
+    description: Default video quality for downloads
+  jellyfin_naming:
+    name: Jellyfin naming
+    description: Automatically name files as Series - S01E01
+  embed_thumbnail:
+    name: Embed thumbnail
+    description: Include YouTube thumbnail in the file
+  embed_metadata:
+    name: Embed metadata
+    description: Include title, artist and other metadata
+  preferred_codec:
+    name: Preferred codec
+    description: Preferred video codec for 4K downloads

@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>yt-dlp Downloader</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --surface: #1a1d23;
+      --surface-hover: #22262e;
+      --border: #2a2e37;
+      --text: #e4e6eb;
+      --text-muted: #8b8f98;
+      --accent: #ff4444;
+      --accent-dim: rgba(255, 68, 68, 0.15);
+      --success: #2dd4a0;
+      --success-dim: rgba(45, 212, 160, 0.15);
+      --warning: #f5a623;
+      --radius: 10px;
+      --font: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 32px;
+    }
+
+    .header-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--accent);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+
+    .header .version {
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--surface);
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    /* ── URL Input ── */
+    .url-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    .url-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .url-input:focus {
+      border-color: var(--accent);
+    }
+
+    .url-input::placeholder {
+      color: var(--text-muted);
+      opacity: 0.5;
+    }
+
+    .btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 20px;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+
+    .btn:hover { opacity: 0.85; }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--text-muted);
+      color: var(--text);
+    }
+
+    /* ── Preview ── */
+    .preview {
+      display: none;
+      margin-top: 16px;
+      padding: 16px;
+      background: var(--bg);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .preview.active { display: flex; gap: 16px; align-items: flex-start; }
+
+    .preview-thumb {
+      width: 160px;
+      min-width: 160px;
+      border-radius: 6px;
+      object-fit: cover;
+      aspect-ratio: 16/9;
+      background: var(--surface);
+    }
+
+    .preview-info { flex: 1; }
+
+    .preview-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+
+    .preview-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .preview-meta span { margin-right: 12px; }
+
+    .preview-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-top: 8px;
+    }
+
+    .badge-video { background: var(--accent-dim); color: var(--accent); }
+    .badge-playlist { background: var(--success-dim); color: var(--success); }
+
+    /* ── Options Grid ── */
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 640px) {
+      .options-grid { grid-template-columns: 1fr; }
+      .url-group { flex-direction: column; }
+      .preview.active { flex-direction: column; }
+      .preview-thumb { width: 100%; }
+    }
+
+    .option-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .select-wrap select,
+    .input-wrap input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 12px;
+      outline: none;
+    }
+
+    .select-wrap select:focus,
+    .input-wrap input:focus {
+      border-color: var(--accent);
+    }
+
+    .select-wrap select option {
+      background: var(--surface);
+    }
+
+    /* ── Toggle ── */
+    .toggles {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .toggle-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .toggle-item input[type="checkbox"] {
+      appearance: none;
+      width: 32px;
+      height: 18px;
+      background: var(--border);
+      border-radius: 9px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle-item input[type="checkbox"]::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .toggle-item input[type="checkbox"]:checked {
+      background: var(--accent-dim);
+    }
+
+    .toggle-item input[type="checkbox"]:checked::after {
+      transform: translateX(14px);
+      background: var(--accent);
+    }
+
+    /* ── Jellyfin Series ── */
+    .series-opts {
+      display: none;
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--bg);
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .series-opts.active { display: block; }
+
+    .series-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 10px;
+    }
+
+    /* ── Download Button ── */
+    .download-actions {
+      margin-top: 16px;
+      display: flex;
+      gap: 8px;
+    }
+
+    /* ── Downloads List ── */
+    .dl-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px;
+      background: var(--bg);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin-bottom: 8px;
+    }
+
+    .dl-thumb {
+      width: 64px;
+      min-width: 64px;
+      aspect-ratio: 16/9;
+      border-radius: 4px;
+      object-fit: cover;
+      background: var(--surface);
+    }
+
+    .dl-info { flex: 1; min-width: 0; }
+
+    .dl-title {
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+
+    .dl-meta {
+      font-size: 10px;
+      color: var(--text-muted);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .dl-progress-bar {
+      flex: 1;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      min-width: 80px;
+    }
+
+    .dl-progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 0.3s;
+    }
+
+    .dl-progress-fill.done { background: var(--success); }
+
+    .dl-status {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    .status-downloading { color: var(--accent); }
+    .status-processing { color: var(--warning); }
+    .status-completed { color: var(--success); }
+    .status-error { color: #ff6b6b; }
+    .status-starting { color: var(--text-muted); }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .empty-state .icon { font-size: 32px; margin-bottom: 8px; }
+
+    /* ── Chapters ── */
+    .chapter-list {
+      margin-top: 10px;
+      max-height: 180px;
+      overflow-y: auto;
+      font-size: 11px;
+    }
+
+    .chapter-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .chapter-item:last-child { border-bottom: none; }
+    .chapter-time { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Loading state for fetch ── */
+    .fetching .url-input { opacity: 0.5; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-icon">▶</div>
+    <h1>yt-dlp</h1>
+    <span class="version">v0.2.0</span>
+  </div>
+
+  <!-- URL Input -->
+  <div class="card" id="urlCard">
+    <div class="card-title">URL</div>
+    <div class="url-group">
+      <input type="text" class="url-input" id="urlInput"
+             placeholder="https://youtube.com/watch?v=... ou playlist URL"
+             autocomplete="off">
+      <button class="btn" id="fetchBtn" onclick="fetchInfo()">Fetch</button>
+    </div>
+    <div class="preview" id="preview"></div>
+  </div>
+
+  <!-- Options -->
+  <div class="card">
+    <div class="card-title">Options</div>
+    <div class="options-grid">
+      <div class="select-wrap">
+        <label class="option-label">Qualité</label>
+        <select id="quality">
+          <option value="audio">Audio only (m4a)</option>
+          <option value="mp3">MP3 320kbps</option>
+          <option value="720p">720p</option>
+          <option value="1080p" selected>1080p</option>
+          <option value="4k">4K</option>
+        </select>
+      </div>
+      <div class="select-wrap">
+        <label class="option-label">Codec préféré (4K)</label>
+        <select id="codec">
+          <option value="av1" selected>AV1 (plus léger)</option>
+          <option value="vp9">VP9</option>
+          <option value="h264">H.264 (compatible)</option>
+          <option value="any">Meilleur dispo</option>
+        </select>
+      </div>
+      <div class="input-wrap" style="grid-column: 1 / -1;">
+        <label class="option-label">Dossier de sortie</label>
+        <input type="text" id="outputDir" value="{{ output_dir }}">
+      </div>
+    </div>
+
+    <div style="margin-top: 14px;">
+      <div class="toggles">
+        <label class="toggle-item">
+          <input type="checkbox" id="embedThumb" {{ 'checked' if embed_thumbnail else '' }}>
+          Thumbnail
+        </label>
+        <label class="toggle-item">
+          <input type="checkbox" id="embedMeta" {{ 'checked' if embed_metadata else '' }}>
+          Métadonnées
+        </label>
+        <label class="toggle-item">
+          <input type="checkbox" id="jellyfinNaming" {{ 'checked' if jellyfin_naming else '' }}
+                 onchange="toggleSeries()">
+          Nommage Jellyfin série
+        </label>
+        <label class="toggle-item" id="chapterToggle" style="display:none;">
+          <input type="checkbox" id="splitChapters">
+          Découper par chapitres
+        </label>
+      </div>
+    </div>
+
+    <div class="series-opts" id="seriesOpts">
+      <div class="series-grid">
+        <div class="input-wrap">
+          <label class="option-label">Nom de la série</label>
+          <input type="text" id="seriesName" placeholder="Ex: Faithful (2023)">
+        </div>
+        <div class="input-wrap">
+          <label class="option-label">Saison</label>
+          <input type="number" id="season" value="1" min="1" max="99">
+        </div>
+      </div>
+    </div>
+
+    <div class="download-actions">
+      <button class="btn" id="dlBtn" onclick="startDownload()" disabled>
+        Télécharger
+      </button>
+    </div>
+  </div>
+
+  <!-- Downloads -->
+  <div class="card">
+    <div class="card-title">Téléchargements</div>
+    <div id="dlList">
+      <div class="empty-state">
+        <div class="icon">📭</div>
+        Aucun téléchargement en cours
+      </div>
+    </div>
+  </div>
+
+<script>
+const API = window.location.pathname.replace(/\/$/, '');
+
+let currentInfo = null;
+
+// ── SocketIO ──
+const socket = io({ path: API + '/socket.io' });
+
+socket.on('progress', (dl) => {
+  updateDownloadItem(dl);
+});
+
+socket.on('all_downloads', (dls) => {
+  if (dls.length > 0) {
+    dls.forEach(dl => updateDownloadItem(dl));
+  }
+});
+
+// ── Fetch Info ──
+async function fetchInfo() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) return;
+
+  const btn = document.getElementById('fetchBtn');
+  const card = document.getElementById('urlCard');
+  btn.disabled = true;
+  btn.textContent = '...';
+  card.classList.add('fetching');
+
+  try {
+    const res = await fetch(API + '/api/info', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      alert('Erreur: ' + data.error);
+      return;
+    }
+
+    currentInfo = data;
+    showPreview(data);
+    document.getElementById('dlBtn').disabled = false;
+
+    // Auto-fill series name if playlist
+    if (data.is_playlist) {
+      document.getElementById('seriesName').value = data.title || '';
+    }
+  } catch (e) {
+    alert('Erreur réseau: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Fetch';
+    card.classList.remove('fetching');
+  }
+}
+
+function showPreview(data) {
+  const el = document.getElementById('preview');
+  const duration = data.duration ? formatDuration(data.duration) : '';
+  const badge = data.is_playlist
+    ? `<span class="preview-badge badge-playlist">Playlist · ${data.count} vidéos</span>`
+    : `<span class="preview-badge badge-video">Vidéo</span>`;
+
+  let chaptersHtml = '';
+  if (data.chapters && data.chapters.length > 0) {
+    chaptersHtml = `<div class="chapter-list">` +
+      data.chapters.map(ch =>
+        `<div class="chapter-item">
+          <span>${escHtml(ch.title)}</span>
+          <span class="chapter-time">${formatTimestamp(ch.start_time)}</span>
+        </div>`
+      ).join('') + `</div>`;
+  }
+
+  el.innerHTML = `
+    ${data.thumbnail ? `<img class="preview-thumb" src="${data.thumbnail}" alt="">` : ''}
+    <div class="preview-info">
+      <div class="preview-title">${escHtml(data.title)}</div>
+      <div class="preview-meta">
+        <span>${escHtml(data.uploader)}</span>
+        ${duration ? `<span>${duration}</span>` : ''}
+        ${data.available_resolutions ? `<span>Max: ${Math.max(...data.available_resolutions)}p</span>` : ''}
+        ${data.chapters && data.chapters.length > 0 ? `<span>${data.chapters.length} chapitres</span>` : ''}
+      </div>
+      ${badge}
+      ${chaptersHtml}
+    </div>
+  `;
+  el.classList.add('active');
+
+  // Show/hide chapter split toggle
+  const chToggle = document.getElementById('chapterToggle');
+  chToggle.style.display = (data.chapters && data.chapters.length > 0) ? 'flex' : 'none';
+}
+
+// ── Start Download ──
+async function startDownload() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) return;
+
+  const jellyfinOn = document.getElementById('jellyfinNaming').checked;
+  const isSeries = jellyfinOn && currentInfo && currentInfo.is_playlist;
+
+  const payload = {
+    url,
+    quality: document.getElementById('quality').value,
+    codec: document.getElementById('codec').value,
+    output_dir: document.getElementById('outputDir').value,
+    jellyfin_naming: jellyfinOn,
+    embed_thumbnail: document.getElementById('embedThumb').checked,
+    embed_metadata: document.getElementById('embedMeta').checked,
+    is_series: isSeries,
+    series_name: document.getElementById('seriesName').value,
+    season: parseInt(document.getElementById('season').value) || 1,
+    split_chapters: document.getElementById('splitChapters').checked,
+  };
+
+  try {
+    const res = await fetch(API + '/api/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      alert('Erreur: ' + data.error);
+      return;
+    }
+
+    // Add placeholder
+    updateDownloadItem({
+      id: data.id,
+      title: currentInfo ? currentInfo.title : 'Starting...',
+      thumbnail: currentInfo ? currentInfo.thumbnail : '',
+      status: 'starting',
+      progress: 0,
+      speed: '',
+      eta: '',
+      quality: payload.quality,
+    });
+
+  } catch (e) {
+    alert('Erreur: ' + e.message);
+  }
+}
+
+// ── Download List ──
+function updateDownloadItem(dl) {
+  const list = document.getElementById('dlList');
+
+  // Remove empty state
+  const empty = list.querySelector('.empty-state');
+  if (empty) empty.remove();
+
+  let item = document.getElementById('dl-' + dl.id);
+  if (!item) {
+    item = document.createElement('div');
+    item.id = 'dl-' + dl.id;
+    item.className = 'dl-item';
+    list.prepend(item);
+  }
+
+  const isDone = dl.status === 'completed';
+  const statusClass = 'status-' + dl.status;
+  const statusLabel = {
+    starting: 'Démarrage...',
+    downloading: `${dl.progress}%`,
+    processing: 'Conversion...',
+    completed: 'Terminé',
+    error: 'Erreur',
+  }[dl.status] || dl.status;
+
+  item.innerHTML = `
+    ${dl.thumbnail ? `<img class="dl-thumb" src="${dl.thumbnail}" alt="">` : '<div class="dl-thumb"></div>'}
+    <div class="dl-info">
+      <div class="dl-title">${escHtml(dl.title || 'Chargement...')}</div>
+      <div class="dl-meta">
+        <span>${dl.quality || ''}</span>
+        ${dl.speed ? `<span>${dl.speed}</span>` : ''}
+        ${dl.eta ? `<span>ETA ${dl.eta}</span>` : ''}
+      </div>
+    </div>
+    <div class="dl-progress-bar">
+      <div class="dl-progress-fill ${isDone ? 'done' : ''}"
+           style="width: ${dl.progress || 0}%"></div>
+    </div>
+    <span class="dl-status ${statusClass}">
+      ${dl.status === 'starting' ? '<span class="spinner"></span>' : ''}
+      ${statusLabel}
+    </span>
+  `;
+
+  if (dl.status === 'error' && dl.error) {
+    item.title = dl.error;
+  }
+}
+
+// ── Helpers ──
+function toggleSeries() {
+  const on = document.getElementById('jellyfinNaming').checked;
+  const isPlaylist = currentInfo && currentInfo.is_playlist;
+  document.getElementById('seriesOpts').classList.toggle('active', on && isPlaylist);
+}
+
+function formatDuration(s) {
+  if (!s) return '';
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return h > 0 ? `${h}h${m.toString().padStart(2, '0')}` : `${m}min`;
+}
+
+function formatTimestamp(s) {
+  if (!s && s !== 0) return '';
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = Math.floor(s % 60);
+  if (h > 0) return `${h}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+  return `${m}:${sec.toString().padStart(2,'0')}`;
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// Enter key on URL input
+document.getElementById('urlInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') fetchInfo();
+});
+
+// Set defaults from server config
+document.getElementById('quality').value = '{{ default_quality }}';
+document.getElementById('codec').value = '{{ preferred_codec }}';
+</script>
+
+</body>
+</html>

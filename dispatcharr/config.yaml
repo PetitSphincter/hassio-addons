@@ -1,0 +1,25 @@
+name: "Dispatcharr"
+description: "IPTV stream manager and HDHomeRun emulator for Jellyfin/Plex/Emby"
+version: "0.1.0"
+slug: "dispatcharr"
+url: "https://github.com/Dispatcharr/Dispatcharr"
+init: false
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+ingress: true
+ingress_port: 9191
+panel_icon: "mdi:television-classic"
+panel_title: "Dispatcharr"
+ports:
+  9191/tcp: 9191
+ports_description:
+  9191/tcp: "Dispatcharr Web UI + HDHomeRun API (nécessaire pour Jellyfin)"
+options:
+  TZ: "Europe/Paris"
+  log_level: "info"
+schema:
+  TZ: str
+  log_level: list(debug|info|warning|error)

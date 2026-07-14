@@ -1,0 +1,19 @@
+configuration:
+  endpoint_url:
+    name: URL du endpoint S3
+    description: URL complète du endpoint S3 (ex. https://s3.example.com)
+  access_key:
+    name: Access Key
+    description: Clé d'accès S3 (AWS_ACCESS_KEY_ID)
+  secret_key:
+    name: Secret Key
+    description: Clé secrète S3 (AWS_SECRET_ACCESS_KEY)
+  region:
+    name: Région
+    description: Région S3 (ex. us-east-1, eu-west-1)
+  verify_ssl:
+    name: Vérifier SSL
+    description: Activer la vérification du certificat SSL
+  default_bucket:
+    name: Bucket par défaut
+    description: Bucket sélectionné automatiquement au démarrage (optionnel)

@@ -1,0 +1,10 @@
+configuration:
+  TZ:
+    name: Fuseau horaire
+    description: Fuseau horaire du conteneur (ex. Europe/Paris)
+  PUID:
+    name: User ID
+    description: UID de l'utilisateur dans le conteneur (0 = root)
+  PGID:
+    name: Group ID
+    description: GID du groupe dans le conteneur (0 = root)
