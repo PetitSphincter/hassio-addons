@@ -1,6 +1,6 @@
 # PetitSphincter Home Assistant Add-ons
 
-[![Add repository on my Home Assistant][repository-badge]][repository-url]
+![Add repository on my Home Assistant][repository-badge]][repository-url]
 ![Addons](https://img.shields.io/badge/addons-7-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
