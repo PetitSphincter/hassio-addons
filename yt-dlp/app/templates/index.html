@@ -693,11 +693,14 @@ function updateDownloadItem(dl) {
 
   const isDone = dl.status === 'completed';
   const statusClass = 'status-' + dl.status;
+  const skipped = dl.skipped || [];
   const statusLabel = {
     starting: 'Démarrage...',
     downloading: `${dl.progress}%`,
     processing: 'Conversion...',
-    completed: 'Terminé',
+    completed: skipped.length
+      ? `Terminé (${skipped.length} ignorée${skipped.length > 1 ? 's' : ''})`
+      : 'Terminé',
     error: 'Erreur',
   }[dl.status] || dl.status;
 
@@ -723,6 +726,10 @@ function updateDownloadItem(dl) {
 
   if (dl.status === 'error' && dl.error) {
     item.title = dl.error;
+  } else if (skipped.length) {
+    item.title = 'Vidéos ignorées :\n' + skipped.join('\n');
+  } else {
+    item.removeAttribute('title');
   }
 }
 
