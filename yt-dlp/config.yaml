@@ -1,6 +1,6 @@
 name: "yt-dlp Downloader"
 description: "Télécharge des vidéos/playlists YouTube avec yt-dlp, optimisé pour Jellyfin"
-version: "0.2.0"
+version: "0.2.2"
 slug: "ytdlp_downloader"
 url: "https://github.com/lexou/hassio-addons"
 arch:
