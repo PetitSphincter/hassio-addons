@@ -1,8 +1,8 @@
 FROM python:3.12-alpine
 
-RUN apk add --no-cache ffmpeg jq \
+RUN apk add --no-cache ffmpeg jq nodejs \
     && pip install --no-cache-dir \
-    yt-dlp \
+    "yt-dlp[default]" \
     flask \
     flask-socketio \
     gevent \
