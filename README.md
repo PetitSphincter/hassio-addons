@@ -25,7 +25,7 @@ Click the button above, or manually:
 | [S3 Browser](s3-browser/) | ![v](https://img.shields.io/badge/0.2.0-blue) | Read-only S3 browser (AWS, Scality, MinIO…) | ![a](https://img.shields.io/badge/amd64%20%7C%20aarch64-lightgrey) |
 | [Traffic Map](traffic-map/) | ![v](https://img.shields.io/badge/1.0.0-blue) | Generates a road traffic map image (CartoDB basemap + Azure Maps overlay) | ![a](https://img.shields.io/badge/multi--arch-lightgrey) |
 | [Ygege](ygege/) | ![v](https://img.shields.io/badge/1.0.0-blue) | YGG Torrent indexer via Nostr relay, for Prowlarr | ![a](https://img.shields.io/badge/amd64%20%7C%20aarch64%20%7C%20armv7-lightgrey) |
-| [yt-dlp Downloader](yt-dlp/) | ![v](https://img.shields.io/badge/0.2.0-blue) | YouTube video/playlist downloads, Jellyfin naming, chapters, MP3 | ![a](https://img.shields.io/badge/amd64%20%7C%20aarch64-lightgrey) |
+| [yt-dlp Downloader](yt-dlp/) | ![v](https://img.shields.io/badge/0.2.2-blue) | YouTube video/playlist downloads, Jellyfin naming, chapters, MP3 | ![a](https://img.shields.io/badge/amd64%20%7C%20aarch64-lightgrey) |
 
 ## Philosophy
 
