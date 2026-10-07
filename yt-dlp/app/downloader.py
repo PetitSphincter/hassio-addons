@@ -14,6 +14,13 @@ import yt_dlp
 downloads = {}
 downloads_lock = threading.Lock()
 
+# Options shared by every yt-dlp call.
+# YouTube requires a JS runtime (plus the yt-dlp-ejs package) to solve its
+# signature/n challenges; without it, stream URLs return HTTP 403.
+BASE_OPTS = {
+    "js_runtimes": {"node": {}},
+}
+
 # Quality to format mapping
 FORMAT_MAP = {
     "audio": {
@@ -65,6 +72,7 @@ def get_merge_format(quality: str) -> str:
 def fetch_info(url: str) -> dict:
     """Fetch video/playlist metadata without downloading."""
     ydl_opts = {
+        **BASE_OPTS,
         "quiet": True,
         "no_warnings": True,
         "extract_flat": "in_playlist",
@@ -150,6 +158,7 @@ def start_download(
             "started_at": datetime.now().isoformat(),
             "completed_at": None,
             "quality": quality,
+            "skipped": [],
         }
 
     thread = threading.Thread(
@@ -161,6 +170,30 @@ def start_download(
     )
     thread.start()
     return dl_id
+
+
+class _SkipLogger:
+    """yt-dlp logger that records the playlist entries that were skipped."""
+
+    def __init__(self, dl_id):
+        self.dl_id = dl_id
+
+    def debug(self, msg):
+        pass
+
+    def info(self, msg):
+        pass
+
+    def warning(self, msg):
+        pass
+
+    def error(self, msg):
+        msg = msg.removeprefix("ERROR: ").strip()
+        print(f"[ytdlp] Skipped: {msg}", flush=True)
+        with downloads_lock:
+            dl = downloads.get(self.dl_id)
+            if dl is not None:
+                dl["skipped"].append(msg)
 
 
 def _make_progress_hook(dl_id, socketio=None):
@@ -221,6 +254,7 @@ def _download_worker(
 
         # Build yt-dlp options
         ydl_opts = {
+            **BASE_OPTS,
             "format": get_format_string(quality, codec),
             "outtmpl": outtmpl,
             "no_overwrites": True,
@@ -243,7 +277,7 @@ def _download_worker(
                 "preferredquality": "320",
             })
 
-        # Chapter splitting — yt-dlp native SplitChapters postprocessor
+        # Chapter splitting: yt-dlp native SplitChapters postprocessor
         if split_chapters and not is_series:
             postprocessors.append({
                 "key": "FFmpegSplitChapters",
@@ -272,8 +306,16 @@ def _download_worker(
         if postprocessors:
             ydl_opts["postprocessors"] = postprocessors
 
-        # Fetch title before download
-        with yt_dlp.YoutubeDL({"quiet": True, "skip_download": True}) as ydl:
+        # Fetch title before download.
+        # extract_flat: a playlist URL only lists its entries here instead of
+        # resolving every video (faster, and a private video can't abort it).
+        with yt_dlp.YoutubeDL({
+            **BASE_OPTS,
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "extract_flat": "in_playlist",
+        }) as ydl:
             info = ydl.extract_info(url, download=False)
             with downloads_lock:
                 dl = downloads[dl_id]
@@ -281,6 +323,13 @@ def _download_worker(
                 dl["thumbnail"] = info.get("thumbnail", "")
             if socketio:
                 socketio.emit("progress", _get_download_safe(dl_id))
+
+        # Playlist: skip unavailable entries (private, deleted, geo-blocked...)
+        # instead of aborting the whole download. Postprocessing errors stay
+        # fatal ("only_download"). A single video keeps failing loudly.
+        if info.get("_type") == "playlist":
+            ydl_opts["ignoreerrors"] = "only_download"
+            ydl_opts["logger"] = _SkipLogger(dl_id)
 
         # Download
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
