@@ -14,5 +14,8 @@ export INGRESS_PATH=""
 echo "[ytdlp] Starting yt-dlp Downloader..."
 echo "[ytdlp] Output: ${OUTPUT_DIR}"
 
+echo "[ytdlp] Updating yt-dlp..."
+pip install --no-cache-dir -q -U --root-user-action=ignore --disable-pip-version-check "yt-dlp[default]" || echo "[ytdlp] Update failed, using bundled version"
+
 cd /app
 exec python3 server.py
